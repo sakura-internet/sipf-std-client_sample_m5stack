@@ -110,7 +110,6 @@ static int sipfSendR(uint8_t addr, uint8_t *read_value)
     // $Rコマンド応答待ち
     for (;;) {
         ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 10000);
-        Serial.printf("SipfUtilReadLine:%d %s\r\n", ret, cmd);
         if (ret == -3) {
             //タイムアウト
             return -3;
@@ -162,7 +161,6 @@ int SipfSetAuthMode(uint8_t mode)
     for (;;) {
         delay(200);
         ret = sipfSendR(0x00, &val);
-        Serial.printf("val=%d\r\n", val);
         if (ret != 0) {
             return ret;
         }
@@ -227,10 +225,13 @@ int SipfCmdTx(uint8_t tag_id, SimpObjTypeId type, uint8_t *value, uint8_t value_
     // $$TXコマンド送信
     len = sprintf(cmd, "$$TX %02X %02X ", tag_id, (uint8_t)type);
     switch (type) {
-        OBJ_TYPE_BIN_BASE64:
-        OBJ_TYPE_STR_UTF8:
-            // Unimplemented
-            return -1;
+        case OBJ_TYPE_BIN_BASE64:
+        case OBJ_TYPE_STR_UTF8:
+			//順番どおりに文字列に変換
+            for (int i = 0; i < value_len; i++) {
+                len += sprintf(&cmd[len], "%02X", value[i]);
+            }
+            break;
         default:
             // リトルエンディアンだからアドレス上位から順に文字列に変換
             for (int i = (value_len - 1); i >= 0; i--) {

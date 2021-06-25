@@ -100,8 +100,6 @@ void setup() {
 
   Serial.begin(115200);
 
-  Serial.printf("width: %d\n", M5.Lcd.width());
-
   M5.Lcd.setBrightness(127);
 
   drawTitle();
