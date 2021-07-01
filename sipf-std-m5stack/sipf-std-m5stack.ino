@@ -30,7 +30,7 @@ static int resetSipfModule()
   // 起動完了メッセージ待ち
   int len;
   for (;;) {
-    len = SipfUtilReadLine(buff, sizeof(buff), 30000);
+    len = SipfUtilReadLine(buff, sizeof(buff), 300000); //タイムアウト5分
     if (len < 0) {
       return -1;  //Serialのエラーかタイムアウト
     }
@@ -100,6 +100,8 @@ void setup() {
 
   Serial.begin(115200);
 
+  Serial.printf("width: %d\n", M5.Lcd.width());
+
   M5.Lcd.setBrightness(127);
 
   drawTitle();
@@ -151,7 +153,7 @@ void loop() {
   if (M5.BtnA.wasPressed()) {
     cnt_btn1++;
     drawResultWindow();
-    M5.Lcd.printf("ButtonA pushed: TX(tag_id=0x00 value=%d)\n", cnt_btn1);
+    M5.Lcd.printf("ButtonA pushed: TX(tag_id=0x01 value=%d)\n", cnt_btn1);
     memset(buff, 0, sizeof(buff));
     int ret = SipfCmdTx(0x01, OBJ_TYPE_UINT32, (uint8_t*)&cnt_btn1, 4, buff);
     if (ret == 0) {
@@ -165,7 +167,7 @@ void loop() {
   if (M5.BtnB.wasPressed()) {
     cnt_btn2++;
     drawResultWindow();
-    M5.Lcd.printf("ButtonB pushed: TX(tag_id=0x01 value=%d)\n", cnt_btn2);
+    M5.Lcd.printf("ButtonB pushed: TX(tag_id=0x02 value=%d)\n", cnt_btn2);
     memset(buff, 0, sizeof(buff));
     int ret = SipfCmdTx(0x02, OBJ_TYPE_UINT32, (uint8_t*)&cnt_btn2, 4, buff);
     if (ret == 0) {
@@ -179,9 +181,9 @@ void loop() {
   if (M5.BtnC.wasPressed()) {
     cnt_btn3++;
     drawResultWindow();
-    M5.Lcd.printf("ButtonC pushed: TX(tag_id=0x02 value=%d)\n", cnt_btn3);
+    M5.Lcd.printf("ButtonC pushed: TX(tag_id=0x03 value=%d)\n", cnt_btn3);
     memset(buff, 0, sizeof(buff));
-    int ret = SipfCmdTx(0x02, OBJ_TYPE_UINT32, (uint8_t*)&cnt_btn3, 4, buff);
+    int ret = SipfCmdTx(0x03, OBJ_TYPE_UINT32, (uint8_t*)&cnt_btn3, 4, buff);
     if (ret == 0) {
       M5.Lcd.printf("OK\nOTID: %s\n", buff);
       drawButton(2, cnt_btn3);
