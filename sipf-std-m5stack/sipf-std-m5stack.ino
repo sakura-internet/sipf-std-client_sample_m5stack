@@ -28,24 +28,35 @@ static int resetSipfModule()
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
 
   // 起動完了メッセージ待ち
-  int len;
+  Serial.println("### MODULE OUTPUT ###");
+  int len, is_echo = 0;
   for (;;) {
-    len = SipfUtilReadLine(buff, sizeof(buff), 300000); //タイムアウト5分
+    len = SipfUtilReadLine(buff, sizeof(buff), 300000); //タイムアウト300秒
     if (len < 0) {
       return -1;  //Serialのエラーかタイムアウト
     }
-
+    if (len == 1) {
+      //空行なら次の行へ
+      continue;
+    }
     if (len >= 13) {
-      //ICCIDを出力
-      if (memcmp(buff, "ICCID:", 6) == 0) {
-        Serial.println((char*)buff);
-        continue;
+      if (memcmp(buff, "*** SIPF Client", 15) == 0) {
+        is_echo = 1;
       }
       //起動完了メッセージを確認
       if (memcmp(buff, "+++ Ready +++", 13) == 0) {
-        Serial.println((char*)buff);
+        Serial.println("#####################");
         break;
       }
+      //接続リトライオーバー
+      if (memcmp(buff, "ERR:Faild", 9) == 0) {
+        Serial.println((char*)buff);
+        Serial.println("#####################");
+        return -1;
+      }
+    }
+    if (is_echo) {
+      Serial.printf("%s\r\n", (char*)buff);
     }
   }
   return 0;
@@ -100,8 +111,6 @@ void setup() {
 
   Serial.begin(115200);
 
-  Serial.printf("width: %d\n", M5.Lcd.width());
-
   M5.Lcd.setBrightness(127);
 
   drawTitle();
@@ -120,8 +129,8 @@ void setup() {
   } else {
     M5.Lcd.printf(" NG\n");
     return;
-  }
-
+  }  
+  
   drawResultWindow();
 
   cnt_btn1 = 0;
@@ -131,6 +140,9 @@ void setup() {
   drawButton(0, cnt_btn1);
   drawButton(1, cnt_btn2);
   drawButton(2, cnt_btn3);
+
+  Serial.println("+++ Ready +++");
+  SipfClientFlushReadBuff();
 }
 
 void loop() {

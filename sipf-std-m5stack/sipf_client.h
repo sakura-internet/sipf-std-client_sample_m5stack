@@ -33,6 +33,7 @@ int SipfSetAuthInfo(char *user_name, char *password);
 int SipfCmdTx(uint8_t tag_id, SimpObjTypeId type, uint8_t *value, uint8_t value_len, uint8_t *otid);
 
 int SipfUtilReadLine(uint8_t *buff, int buff_len, int timeout_ms);
+void SipfClientFlushReadBuff(void);
 
 #ifdef __cplusplus
 }

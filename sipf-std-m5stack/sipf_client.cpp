@@ -11,7 +11,7 @@
 static char cmd[256];
 
 //UARTの受信バッファを読み捨てる
-static void flushReadBuff(void)
+void SipfClientFlushReadBuff(void)
 {
     int len;
     uint8_t b;
@@ -69,7 +69,7 @@ static int sipfSendW(uint8_t addr, uint8_t value)
     int ret;
     
     //UART受信バッファを読み捨てる
-    flushReadBuff();
+    SipfClientFlushReadBuff();
 
     // $Wコマンド送信
     len = sprintf(cmd, "$W %02X %02X\r\n", addr, value);
@@ -101,7 +101,7 @@ static int sipfSendR(uint8_t addr, uint8_t *read_value)
 {
     int len, ret;
     char *endptr;
-    flushReadBuff();
+    SipfClientFlushReadBuff();
 
     // $Rコマンド送信
     len = sprintf(cmd, "$R %02X\r\n", addr);
@@ -220,7 +220,7 @@ int SipfCmdTx(uint8_t tag_id, SimpObjTypeId type, uint8_t *value, uint8_t value_
     int ret;
     
     //UART受信バッファを読み捨てる
-    flushReadBuff();
+    SipfClientFlushReadBuff();
 
     // $$TXコマンド送信
     len = sprintf(cmd, "$$TX %02X %02X ", tag_id, (uint8_t)type);
