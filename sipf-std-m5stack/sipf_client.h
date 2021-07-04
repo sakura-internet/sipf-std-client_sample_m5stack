@@ -27,6 +27,21 @@ typedef enum {
     OBJ_TYPE_STR_UTF8   = 0x20
 }   SimpObjTypeId;
 
+typedef struct {
+  bool fixed;
+  float longitude;
+  float latitude;
+  float altitude;
+  float speed;
+  float heading;
+  int year;
+  int month;
+  int day;
+  int hour;
+  int minute;
+  int second;
+} GnssLocation;
+
 int SipfSetAuthMode(uint8_t mode);
 int SipfSetAuthInfo(char *user_name, char *password);
 
@@ -34,6 +49,11 @@ int SipfCmdTx(uint8_t tag_id, SimpObjTypeId type, uint8_t *value, uint8_t value_
 
 int SipfUtilReadLine(uint8_t *buff, int buff_len, int timeout_ms);
 void SipfClientFlushReadBuff(void);
+
+int SipfSetGnss(bool is_active);
+int SipfGetGnssLocation(GnssLocation *loc);
+
+
 
 #ifdef __cplusplus
 }

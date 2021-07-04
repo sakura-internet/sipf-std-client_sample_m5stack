@@ -42,6 +42,7 @@ int SipfUtilReadLine(uint8_t *buff, int buff_len, int timeout_ms)
                 if (idx < buff_len) {
                     //行末を判定
                     if ((b == '\r') || (b == '\n')) {
+                        buff[idx] = '\0';
                         return idx + 1; //長さを返す
                     }
                     //バッファに詰める
@@ -213,6 +214,169 @@ int SipfSetAuthInfo(char *user_name, char *password)
 
     return 0;
 }
+
+
+int SipfSetGnss(bool is_active) {
+    int len;
+    int ret;
+
+    //UART受信バッファを読み捨てる
+    SipfClientFlushReadBuff();
+
+    // $$GNSSENコマンド送信
+    len = sprintf(cmd, "$$GNSSEN %d\r\n", is_active?1:0);
+    ret = Serial2.write((uint8_t*)cmd, len);
+
+    // 応答待ち
+    for (;;) {
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 1000); // 0.5秒間なにも応答なかったら諦める
+        if (ret == -3) {
+            // タイムアウト
+            return -3;
+        }
+        if (cmd[0] == '$') {
+            //エコーバック
+            continue;
+        }
+        if (memcmp(cmd, "NG", 2) == 0) {
+            // NG
+            return -1;
+        }
+        if (memcmp(cmd, "OK", 2) == 0) {
+            // OK
+            break;
+        }
+    }
+
+    return 0;
+}
+
+
+int SipfGetGnssLocation(GnssLocation *loc) {
+    int len;
+    int ret;
+
+    if (loc == NULL) {
+      return -1;
+    }
+
+    //UART受信バッファを読み捨てる
+    SipfClientFlushReadBuff();
+
+    // $$GNSSLOCコマンド送信
+    len = sprintf(cmd, "$$GNSSLOC\r\n");
+    ret = Serial2.write((uint8_t*)cmd, len);
+
+    // 位置情報待ち
+    for (;;) {
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 10000); // 10秒間なにも応答がなかったら諦める
+        if (ret == -3) {
+            //タイムアウト
+            return -3;
+        }
+
+        if (cmd[0] == '$') {
+            // エコーバック
+            continue;
+        }
+        if (memcmp(cmd, "NG", 2) == 0) {
+            // NG
+            return -1;
+        }
+        if (cmd[0] == 'A' || cmd[0] == 'V') {
+            // 位置情報
+            int counter = 0;
+            char *head = cmd;
+            char *next = cmd;
+            bool is_last = false;
+            for(;;) {
+              while(*next != '\0' && *next != ','){
+                next++;
+              }
+              is_last = (*next == '\0');
+              *next = '\0';
+              next++;
+              String str = String(head);
+
+              switch(counter){
+                case 0: // FIXED
+                  if (head[0] == 'A')
+                    loc->fixed = true;
+                  else if (head[0] == 'V')
+                    loc->fixed = false;
+                  else
+                    return -2;
+                  break;
+                case 1: // Longitude
+                  loc->longitude = str.toFloat();
+                  break;
+                case 2: // Latitude
+                  loc->latitude = str.toFloat();
+                  break;
+                case 3: // Altitude
+                  loc->altitude = str.toFloat();
+                  break;
+                case 4: // Speed
+                  loc->speed = str.toFloat();
+                  break;
+                case 5: // Heading
+                  loc->heading = str.toFloat();
+                  break;
+                case 6: // Datetime
+                  if (strlen(head) != 20) {
+                    return -2;
+                  }
+                  if (head[4] != '-' || head[7] != '-' || head[10] != 'T' || head[13] != ':' ||  head[16] != ':' ||  head[19] != 'Z'){
+                    return -2;
+                  }
+                  head[4] = '\0';
+                  head[7] = '\0';
+                  head[10] = '\0';
+                  head[13] = '\0';
+                  head[16] = '\0';
+                  head[19] = '\0';
+                  loc->year = atoi(&head[0]);
+                  loc->month = atoi(&head[5]);
+                  loc->day = atoi(&head[8]);
+                  loc->hour = atoi(&head[11]);
+                  loc->minute = atoi(&head[14]);
+                  loc->second = atoi(&head[17]);
+                  break;
+              }
+
+              if (is_last){
+                if (counter != 6) {
+                  return -2;
+                }
+                break;
+              }
+              head = next;
+              counter++;
+            }
+            break;
+        }
+    }
+
+    // OK応答待ち
+    for (;;) {
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 1000); // 0.5秒間なにも応答なかったら諦める
+        if (ret == -3) {
+            // タイムアウト
+            return -3;
+        }
+        if (memcmp(cmd, "NG", 2) == 0) {
+            // NG
+            return -1;
+        }
+        if (memcmp(cmd, "OK", 2) == 0) {
+            // OK
+            break;
+        }
+    }
+
+    return 0;
+}
+
 
 int SipfCmdTx(uint8_t tag_id, SimpObjTypeId type, uint8_t *value, uint8_t value_len, uint8_t *otid)
 {
