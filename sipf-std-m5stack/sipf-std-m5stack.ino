@@ -8,6 +8,8 @@
 #include <string.h>
 #include "sipf_client.h"
 
+//#define ENABLE_GNSS
+
 /**
  * SIPF接続情報
  */
@@ -104,6 +106,7 @@ static void drawResultWindow(void)
   setCursorResultWindow();
 }
 
+#ifdef ENABLE_GNSS
 static void printGnssLocation(GnssLocation *gnss_location_p) {
   if (!gnss_location_p->fixed) {
     M5.Lcd.printf("Not fixed\n");
@@ -140,6 +143,7 @@ static void drawGnssLocation(GnssLocation *gnss_location_p) {
 
   setCursorResultWindow();
 }
+#endif
 
 void setup() {
   // put your setup code here, to run once:
@@ -167,7 +171,7 @@ void setup() {
     M5.Lcd.printf(" NG\n");
     return;
   }
-
+#ifdef ENABLE_GNSS
   M5.Lcd.printf("Enable GNSS..");
   if (SipfSetGnss(true) == 0) {
     M5.Lcd.printf(" OK\n");
@@ -175,7 +179,7 @@ void setup() {
     M5.Lcd.printf(" NG\n");
     return;
   }
-  
+#endif
   drawResultWindow();
 
   cnt_btn1 = 0;
@@ -205,7 +209,7 @@ void loop() {
     unsigned char b = Serial2.read();
     Serial.write(b);
   }
-
+#ifdef ENABLE_GNSS
   /* GNSS */
   static unsigned long last_gnss_updated = 0;
   if(last_gnss_updated + 1000 < millis()){
@@ -218,7 +222,7 @@ void loop() {
       drawGnssLocation(NULL);
     }
   }
-
+#endif
 
   /* ボタン */
   if (M5.BtnA.wasPressed()) {
