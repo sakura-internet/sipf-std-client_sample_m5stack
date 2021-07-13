@@ -8,6 +8,8 @@
 #include <string.h>
 #include "sipf_client.h"
 
+//#define ENABLE_GNSS
+
 /**
  * SIPF接続情報
  */
@@ -104,6 +106,45 @@ static void drawResultWindow(void)
   setCursorResultWindow();
 }
 
+#ifdef ENABLE_GNSS
+static void printGnssLocation(GnssLocation *gnss_location_p) {
+  if (!gnss_location_p->fixed) {
+    M5.Lcd.printf("Not fixed\n");
+  }else{
+   M5.Lcd.printf("Fixed\n");
+  }
+
+   M5.Lcd.printf("%.6f %.6f\n", gnss_location_p->latitude, gnss_location_p->longitude);
+
+   M5.Lcd.printf("%04d-%02d-%02d %02d:%02d:%02d (UTC)\n",
+    gnss_location_p->year, gnss_location_p->month, gnss_location_p->day,
+    gnss_location_p->hour, gnss_location_p->minute, gnss_location_p->second
+   );
+}
+
+static void drawGnssLocation(GnssLocation *gnss_location_p) {
+
+  M5.Lcd.setTextSize(1);
+
+  M5.Lcd.fillRect(0, 70, 320, 10, 0xfaae);
+  M5.Lcd.setTextColor(TFT_BLACK, 0xfaae);
+  M5.Lcd.setCursor(1, 71);
+  M5.Lcd.printf("GNSS");
+  M5.Lcd.fillRect(0, 80, 320, 30, 0xce79);
+
+  M5.Lcd.setTextColor(TFT_BLACK, 0xce79);
+  M5.Lcd.setCursor(0, 81);
+
+  if(gnss_location_p == NULL) {
+    M5.Lcd.println("GNSS error");
+  }else{
+    printGnssLocation(gnss_location_p);
+  }
+
+  setCursorResultWindow();
+}
+#endif
+
 void setup() {
   // put your setup code here, to run once:
   M5.begin();
@@ -129,8 +170,16 @@ void setup() {
   } else {
     M5.Lcd.printf(" NG\n");
     return;
-  }  
-  
+  }
+#ifdef ENABLE_GNSS
+  M5.Lcd.printf("Enable GNSS..");
+  if (SipfSetGnss(true) == 0) {
+    M5.Lcd.printf(" OK\n");
+  } else {
+    M5.Lcd.printf(" NG\n");
+    return;
+  }
+#endif
   drawResultWindow();
 
   cnt_btn1 = 0;
@@ -160,6 +209,20 @@ void loop() {
     unsigned char b = Serial2.read();
     Serial.write(b);
   }
+#ifdef ENABLE_GNSS
+  /* GNSS */
+  static unsigned long last_gnss_updated = 0;
+  if(last_gnss_updated + 1000 < millis()){
+    last_gnss_updated = millis();
+    GnssLocation gnss_location;
+    int ret = SipfGetGnssLocation(&gnss_location);
+    if (ret == 0) {
+      drawGnssLocation(&gnss_location);
+    } else {
+      drawGnssLocation(NULL);
+    }
+  }
+#endif
 
   /* ボタン */
   if (M5.BtnA.wasPressed()) {
@@ -203,6 +266,7 @@ void loop() {
       M5.Lcd.printf("NG: %d\n", ret);
     }
   }
+
 
   M5.update();
 }
