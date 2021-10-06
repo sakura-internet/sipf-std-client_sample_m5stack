@@ -8,13 +8,28 @@
 #include <string.h>
 #include "sipf_client.h"
 
-//#define ENABLE_GNSS
+/*
+#define ENABLE_GNSS
+*/
 
+#ifndef ENABLE_GNSS
+#define WIN_RESULT_LEFT   (0)
+#define WIN_RESULT_TOP    (50)
+#define WIN_RESULT_WIDTH  (320)
+#define WIN_RESULT_HEIGHT (148)
+#define WIN_RESULT_TITLE_HEIGHT (10)
+#else
+#define WIN_RESULT_LEFT   (0)
+#define WIN_RESULT_TOP    (110)
+#define WIN_RESULT_WIDTH  (320)
+#define WIN_RESULT_HEIGHT (88)
+#define WIN_RESULT_TITLE_HEIGHT (10)
+#endif
 /**
  * SIPF接続情報
  */
 static uint8_t buff[256];
-static uint32_t cnt_btn1, cnt_btn2, cnt_btn3;
+static uint32_t cnt_btn1, cnt_btn2;
 
 static int resetSipfModule()
 {
@@ -84,25 +99,31 @@ static void drawButton(uint8_t button, uint32_t value)
   M5.Lcd.setTextSize(2);
   M5.Lcd.setTextColor(TFT_BLACK, 0xfaae);
   M5.Lcd.setCursor(40 + (95 * button), 210);
-  M5.Lcd.printf("%4d", value);
+
+  if (button != 2) {
+    M5.Lcd.printf("%4d", value);
+  } else {
+    //受信ボタン
+    M5.Lcd.printf(" RX ");
+  }
 }
 
 static void setCursorResultWindow(void)
 {
   M5.Lcd.setTextColor(TFT_BLACK, 0xce79);
-  M5.Lcd.setCursor(0, 121);
+  M5.Lcd.setCursor(0, WIN_RESULT_TOP + WIN_RESULT_TITLE_HEIGHT + 1);
 }
 
 static void drawResultWindow(void)
 {
   M5.Lcd.setTextSize(1);
 
-  M5.Lcd.fillRect(0, 110, 320, 10, 0xfaae);
+  M5.Lcd.fillRect(WIN_RESULT_LEFT, WIN_RESULT_TOP, WIN_RESULT_WIDTH, WIN_RESULT_TITLE_HEIGHT, 0xfaae);
   M5.Lcd.setTextColor(TFT_BLACK, 0xfaae);
-  M5.Lcd.setCursor(1, 111);
+  M5.Lcd.setCursor(1, WIN_RESULT_TOP + 1);
   M5.Lcd.printf("RESULT");
 
-  M5.Lcd.fillRect(0, 120, 320, 78, 0xce79);
+  M5.Lcd.fillRect(WIN_RESULT_LEFT, WIN_RESULT_TOP + WIN_RESULT_TITLE_HEIGHT, WIN_RESULT_WIDTH, WIN_RESULT_HEIGHT - WIN_RESULT_TITLE_HEIGHT, 0xce79);
   setCursorResultWindow();
 }
 
@@ -184,11 +205,10 @@ void setup() {
 
   cnt_btn1 = 0;
   cnt_btn2 = 0;
-  cnt_btn3 = 0;
 
   drawButton(0, cnt_btn1);
   drawButton(1, cnt_btn2);
-  drawButton(2, cnt_btn3);
+  drawButton(2, 0);
 
   Serial.println("+++ Ready +++");
   SipfClientFlushReadBuff();
@@ -224,7 +244,7 @@ void loop() {
   }
 #endif
 
-  /* ボタン */
+  /* `TX1'ボタンを押した */
   if (M5.BtnA.wasPressed()) {
     cnt_btn1++;
     drawResultWindow();
@@ -239,6 +259,7 @@ void loop() {
     }
   }
 
+  /* `TX2'ボタンを押した */
   if (M5.BtnB.wasPressed()) {
     cnt_btn2++;
     drawResultWindow();
@@ -253,20 +274,103 @@ void loop() {
     }
   }
 
+  /* `RX'ボタンを押した */
   if (M5.BtnC.wasPressed()) {
-    cnt_btn3++;
     drawResultWindow();
-    M5.Lcd.printf("ButtonC pushed: TX(tag_id=0x03 value=%d)\n", cnt_btn3);
+    M5.Lcd.printf("ButtonC pushed: RX request.\n");
     memset(buff, 0, sizeof(buff));
-    int ret = SipfCmdTx(0x03, OBJ_TYPE_UINT32, (uint8_t*)&cnt_btn3, 4, buff);
-    if (ret == 0) {
-      M5.Lcd.printf("OK\nOTID: %s\n", buff);
-      drawButton(2, cnt_btn3);
+
+		static SipfObjObject objs[16];
+		uint64_t stm, rtm;
+		uint8_t remain, qty;
+    int ret = SipfCmdRx(buff, &stm, &rtm, &remain, &qty, objs, 16);
+    if (ret > 0) {
+      time_t t;
+      struct tm *ptm;
+      static char ts[128];
+      M5.Lcd.printf("OTID: %s\r\n", buff);
+      //User send datetime.
+      t = (time_t)(stm / 1000);
+      ptm = localtime(&t);
+      strftime(ts, sizeof(ts),"User send datetime(UTC)    : %Y/%m/%d %H:%M:%S\r\n", ptm);
+      M5.Lcd.printf(ts);
+      //SIPF receive datetime.
+      t = (time_t)(rtm / 1000);
+      ptm = localtime(&t);
+      strftime(ts, sizeof(ts),"SIPF received datetime(UTC): %Y/%m/%d %H:%M:%S\r\n", ptm);
+      M5.Lcd.printf(ts);
+      //remain, qty
+      M5.Lcd.printf("remain=%d, qty=%d\r\n", remain, qty);
+      //obj
+      for (int i = 0; i < ret; i++) {
+        M5.Lcd.printf("obj[%d]:type=0x%02x, tag=0x%02x, len=%d, value=", i, objs[i].type, objs[i].tag_id, objs[i].value_len);
+        uint8_t *p_value = objs[i].value;
+        SipfObjPrimitiveType v;
+        switch (objs[i].type) {
+        case OBJ_TYPE_UINT8:
+          memcpy(v.b, p_value, sizeof(uint8_t));
+          M5.Lcd.printf("%u\r\n", v.u8);
+          break;
+        case OBJ_TYPE_INT8:
+          memcpy(v.b, p_value, sizeof(int8_t));
+          M5.Lcd.printf("%d\r\n", v.i8);
+          break;
+        case OBJ_TYPE_UINT16:
+          memcpy(v.b, p_value, sizeof(uint16_t));
+          M5.Lcd.printf("%u\r\n", v.u16);
+          break;
+        case OBJ_TYPE_INT16:
+          memcpy(v.b, p_value, sizeof(int16_t));
+          M5.Lcd.printf("%d\r\n", v.i16);
+          break;
+        case OBJ_TYPE_UINT32:
+          memcpy(v.b, p_value, sizeof(uint32_t));
+          M5.Lcd.printf("%u\r\n", v.u32);
+          break;
+        case OBJ_TYPE_INT32:
+          memcpy(v.b, p_value, sizeof(int32_t));
+          M5.Lcd.printf("%d\r\n", v.i32);
+          break;
+        case OBJ_TYPE_UINT64:
+          memcpy(v.b, p_value, sizeof(uint64_t));
+          M5.Lcd.printf("%llu\r\n", v.u64);
+          break;
+        case OBJ_TYPE_INT64:
+          memcpy(v.b, p_value, sizeof(int64_t));
+          M5.Lcd.printf("%lld\r\n", v.i64);
+          break;
+        case OBJ_TYPE_FLOAT32:
+          memcpy(v.b, p_value, sizeof(float));
+          M5.Lcd.printf("%f\r\n", v.f);
+          break;
+        case OBJ_TYPE_FLOAT64:
+          memcpy(v.b, p_value, sizeof(double));
+          M5.Lcd.printf("%lf\r\n", v.d);
+          break;
+        case OBJ_TYPE_BIN:
+          M5.Lcd.printf("0x");
+          for (int j = 0; j < objs[i].value_len; j++) {
+            M5.Lcd.printf("%02x", objs[i].value[j]);
+          }
+          M5.Lcd.printf("\r\n");
+          break;
+        case OBJ_TYPE_STR_UTF8:
+          for (int j = 0; j < objs[i].value_len; j++) {
+            M5.Lcd.printf("%c", objs[i].value[j]);
+          }
+          M5.Lcd.printf("\r\n");
+          break;
+        default:
+          break;
+        } 
+      }
+      M5.Lcd.printf("OK\n");
+    } else if (ret == 0) {
+      M5.Lcd.printf("RX buffer is empty.\nOK\n");
     } else {
       M5.Lcd.printf("NG: %d\n", ret);
     }
   }
-
 
   M5.update();
 }
