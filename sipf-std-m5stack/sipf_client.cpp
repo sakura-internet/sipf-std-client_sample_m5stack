@@ -78,7 +78,7 @@ static int sipfSendW(uint8_t addr, uint8_t value)
 
     // $Wコマンド応答待ち
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 500); // キャラクタ間タイムアウト500msで1行読む
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CHAR); // キャラクタ間タイムアウトを指定して1行読む
         if (ret == -3) {
             //タイムアウト
             return -3;
@@ -110,7 +110,7 @@ static int sipfSendR(uint8_t addr, uint8_t *read_value)
 
     // $Rコマンド応答待ち
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 10000);
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CMD);
         if (ret == -3) {
             //タイムアウト
             return -3;
@@ -134,7 +134,7 @@ static int sipfSendR(uint8_t addr, uint8_t *read_value)
         }
     }
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 500); // キャラクタ間タイムアウト500msで1行読む
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CHAR); // キャラクタ間タイムアウトを指定して1行読む
         if (ret == -3) {
             //タイムアウト
             return -3;
@@ -229,7 +229,7 @@ int SipfSetGnss(bool is_active) {
 
     // 応答待ち
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 1000); // 0.5秒間なにも応答なかったら諦める
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CMD);
         if (ret == -3) {
             // タイムアウト
             return -3;
@@ -269,7 +269,7 @@ int SipfGetGnssLocation(GnssLocation *loc) {
 
     // 位置情報待ち
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 10000); // 10秒間なにも応答がなかったら諦める
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CMD); // コマンドタイムアウトまでに応答がなかったら諦める
         if (ret == -3) {
             //タイムアウト
             return -3;
@@ -359,7 +359,7 @@ int SipfGetGnssLocation(GnssLocation *loc) {
 
     // OK応答待ち
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 1000); // 0.5秒間なにも応答なかったら諦める
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CHAR); // キャラクタ間タイムアウトまでになにも応答なかったら諦める
         if (ret == -3) {
             // タイムアウト
             return -3;
@@ -409,7 +409,7 @@ int SipfCmdTx(uint8_t tag_id, SipfObjTypeId type, uint8_t *value, uint8_t value_
 
     // OTID待ち
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 10000); // 10秒間なにも応答がなかったら諦める
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CMD); // コマンドタイムアウトまでになにも応答がなかったら諦める
         if (ret == -3) {
             //タイムアウト
             return -3;
@@ -429,7 +429,7 @@ int SipfCmdTx(uint8_t tag_id, SipfObjTypeId type, uint8_t *value, uint8_t value_
         }
     }
     for (;;) {
-        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), 500); // 0.5秒間なにも応答なかったら諦める
+        ret = SipfUtilReadLine((uint8_t*)cmd, sizeof(cmd), TMOUT_CHAR); // キャラクタ間タイムアウトまでになにも応答なかったら諦める
         if (ret == -3) {
             //タイムアウト
             return -3;
@@ -497,7 +497,7 @@ int SipfCmdRx(uint8_t *otid, uint64_t *user_send_datetime_ms, uint64_t *sipf_rec
 
     // 応答を受け取る
     enum cmd_rx_stat rx_stat = W_OTID;
-    int line_timeout_ms = 5000;	// 最初はSIPFからの応答を待つので行間タイムアウトを大きくする
+    int line_timeout_ms = TMOUT_CMD;	// 最初はSIPFからの応答を待つのでコマンドタイムアウトを設定
     uint8_t cnt = 0;
     uint16_t idx = 0;
     char *value_top;
@@ -537,8 +537,8 @@ int SipfCmdRx(uint8_t *otid, uint64_t *user_send_datetime_ms, uint64_t *sipf_rec
     			return -1;
     		}
     		memcpy(otid, cmd, 32);
-    		rx_stat = W_SEND_DTM;		// ユーザーサーバー送信時刻待ちへ
-    		line_timeout_ms = 200;	// 行間タイムアウトを200msに設定
+    		rx_stat = W_SEND_DTM;		    // ユーザーサーバー送信時刻待ちへ
+    		line_timeout_ms = TMOUT_CHAR;	// キャラクタ間タイムアウトに設定
     		break;
     	/* ユーザーサーバー送信時刻待ち */
     	case W_SEND_DTM:
