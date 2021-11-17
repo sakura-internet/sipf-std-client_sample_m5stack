@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
-static char cmd[256];
+static char cmd[512];
+static uint32_t fw_version;
 
 //UARTの受信バッファを読み捨てる
 void SipfClientFlushReadBuff(void)
@@ -215,6 +216,31 @@ int SipfSetAuthInfo(char *user_name, char *password)
     return 0;
 }
 
+/**
+ * Fwバージョンを取得
+ */
+int SipfGetFwVersion(void)
+{
+	uint8_t v = 0;
+	if (sipfSendR(0xf1, &v) != 0) {
+		return -1;
+	}
+	fw_version = (uint32_t)v << 24;	// MAJOR
+	if (sipfSendR(0xf2, &v) != 0) {
+		return -1;
+	}
+	fw_version |= (uint32_t)v << 16;// MINOR
+	if (sipfSendR(0xf3, &v) != 0) {
+		return -1;
+	}
+	fw_version |= (uint32_t)v;		// RELEASE下位
+	if (sipfSendR(0xf4, &v) != 0) {
+		return -1;
+	}
+	fw_version |= (uint32_t)v << 8;	// RELEASE上位
+
+	return 0;
+}
 
 int SipfSetGnss(bool is_active) {
     int len;
@@ -620,16 +646,29 @@ int SipfCmdRx(uint8_t *otid, uint64_t *user_send_datetime_ms, uint64_t *sipf_rec
         		}
 
         		SipfObjObject *obj = &obj_list[cnt++];
-        		// TYPE
-        		if (utilHexToUint8(&cmd[0], &obj->type) == -1) {
-        			// HEXから変換できなかった
-        			return -1;
-        		}
-        		// TAG_ID
-        		if (utilHexToUint8(&cmd[3], &obj->tag_id) == -1) {
-        			// HEXから変換できなかった
-        			return -1;
-        		}
+        		if (fw_version >= 0x00030001) {
+                    // TAG_ID
+                    if (utilHexToUint8(&cmd[0], &obj->tag_id) == -1) {
+                        // HEXから変換できなかった
+                        return -1;
+                    }
+                    // TYPE
+                    if (utilHexToUint8(&cmd[3], &obj->type) == -1) {
+                        // HEXから変換できなかった
+                        return -1;
+                    }
+                } else {
+                    // TYPE
+                    if (utilHexToUint8(&cmd[0], &obj->type) == -1) {
+                        // HEXから変換できなかった
+                        return -1;
+                    }
+                    // TAG_ID
+                    if (utilHexToUint8(&cmd[3], &obj->tag_id) == -1) {
+                        // HEXから変換できなかった
+                        return -1;
+                    }
+                }
         		// VALUE_LEN
         		if (utilHexToUint8(&cmd[6], &obj->value_len) == -1) {
         			// HEXから変換できなかった

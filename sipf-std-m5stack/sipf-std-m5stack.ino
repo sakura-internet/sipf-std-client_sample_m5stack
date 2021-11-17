@@ -185,6 +185,10 @@ void setup() {
     return;
   }
 
+  if (SipfGetFwVersion() != 0) {
+	  M5.Lcd.printf("SipfGetFwVersion(): FAILED\r\n");
+  }
+
   M5.Lcd.printf("Setting auth mode...");
   if (SipfSetAuthMode(0x01) == 0) {
     M5.Lcd.printf(" OK\n");
@@ -303,7 +307,7 @@ void loop() {
       M5.Lcd.printf("remain=%d, qty=%d\r\n", remain, qty);
       //obj
       for (int i = 0; i < ret; i++) {
-        M5.Lcd.printf("obj[%d]:type=0x%02x, tag=0x%02x, len=%d, value=", i, objs[i].type, objs[i].tag_id, objs[i].value_len);
+        M5.Lcd.printf("obj[%d]:tag=0x%02x, type=0x%02x, len=%d, value=", i, objs[i].tag_id, objs[i].type, objs[i].value_len);
         uint8_t *p_value = objs[i].value;
         SipfObjPrimitiveType v;
         switch (objs[i].type) {
