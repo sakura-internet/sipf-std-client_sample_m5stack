@@ -29,7 +29,7 @@
  * SIPF接続情報
  */
 static uint8_t buff[256];
-static uint32_t cnt_btn1, cnt_btn2;
+static uint32_t cnt_btn1;
 
 static int resetSipfModule()
 {
@@ -100,11 +100,16 @@ static void drawButton(uint8_t button, uint32_t value)
   M5.Lcd.setTextColor(TFT_BLACK, 0xfaae);
   M5.Lcd.setCursor(40 + (95 * button), 210);
 
-  if (button != 2) {
+  switch (button) {
+  case 0: // TX
     M5.Lcd.printf("%4d", value);
-  } else {
-    //受信ボタン
+    break;
+  case 1: // RX
     M5.Lcd.printf(" RX ");
+    break;
+  case 2: // FILE PUT
+    M5.Lcd.printf("FILE");
+    break;
   }
 }
 
@@ -185,16 +190,19 @@ void setup() {
     return;
   }
 
-  if (SipfGetFwVersion() != 0) {
+  uint32_t fw_version;
+  if (SipfGetFwVersion(&fw_version) != 0) {
 	  M5.Lcd.printf("SipfGetFwVersion(): FAILED\r\n");
   }
 
-  M5.Lcd.printf("Setting auth mode...");
-  if (SipfSetAuthMode(0x01) == 0) {
-    M5.Lcd.printf(" OK\n");
-  } else {
-    M5.Lcd.printf(" NG\n");
-    return;
+  if (fw_version < 0x000400) {
+    M5.Lcd.printf("Setting auth mode...");
+    if (SipfSetAuthMode(0x01) == 0) {
+      M5.Lcd.printf(" OK\n");
+    } else {
+      M5.Lcd.printf(" NG\n");
+      return;
+    }
   }
 #ifdef ENABLE_GNSS
   M5.Lcd.printf("Enable GNSS..");
@@ -208,10 +216,9 @@ void setup() {
   drawResultWindow();
 
   cnt_btn1 = 0;
-  cnt_btn2 = 0;
 
   drawButton(0, cnt_btn1);
-  drawButton(1, cnt_btn2);
+  drawButton(1, 0);
   drawButton(2, 0);
 
   Serial.println("+++ Ready +++");
@@ -263,25 +270,10 @@ void loop() {
     }
   }
 
-  /* `TX2'ボタンを押した */
-  if (M5.BtnB.wasPressed()) {
-    cnt_btn2++;
-    drawResultWindow();
-    M5.Lcd.printf("ButtonB pushed: TX(tag_id=0x02 value=%d)\n", cnt_btn2);
-    memset(buff, 0, sizeof(buff));
-    int ret = SipfCmdTx(0x02, OBJ_TYPE_UINT32, (uint8_t*)&cnt_btn2, 4, buff);
-    if (ret == 0) {
-      M5.Lcd.printf("OK\nOTID: %s\n", buff);
-      drawButton(1, cnt_btn2);
-    } else {
-      M5.Lcd.printf("NG: %d\n", ret);
-    }
-  }
-
   /* `RX'ボタンを押した */
-  if (M5.BtnC.wasPressed()) {
+  if (M5.BtnB.wasPressed()) {
     drawResultWindow();
-    M5.Lcd.printf("ButtonC pushed: RX request.\n");
+    M5.Lcd.printf("ButtonB pushed: RX request.\n");
     memset(buff, 0, sizeof(buff));
 
 		static SipfObjObject objs[16];
@@ -371,6 +363,27 @@ void loop() {
       M5.Lcd.printf("OK\n");
     } else if (ret == 0) {
       M5.Lcd.printf("RX buffer is empty.\nOK\n");
+    } else {
+      M5.Lcd.printf("NG: %d\n", ret);
+    }
+  }
+
+  /* `FILE'ボタンを押した */
+  if (M5.BtnC.wasPressed()) {
+    drawResultWindow();
+    M5.Lcd.printf("ButtonC pushed: FILE PUT request.\n");
+    //テキストファイルを用意
+    int len = sprintf((char *)buff, "millis(): 0x%08x\r\n", millis());
+    len += sprintf((char *)&buff[len], "Tx count: %d\r\n", cnt_btn1);
+    for (int i = 0; i < (sizeof(buff) - len); i++) {
+      buff[len+i] = (uint8_t)(i % 0x5f) + 0x20;
+    }
+
+    M5.Lcd.printf("\n\n%s\n\n", (char *)buff);
+
+    int ret = SipfCmdFput("FPUT_SAMPLE_M5.txt", buff, sizeof(buff));
+    if (ret == 0) {
+      M5.Lcd.printf("OK\n");
     } else {
       M5.Lcd.printf("NG: %d\n", ret);
     }
